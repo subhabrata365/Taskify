@@ -571,19 +571,69 @@ The API code lives in the `server/` subfolder, not the repo root.
    server
    ```
 
-4. Save / apply changes.
+#### How to save in Railway (read this — there is no separate Save button)
+
+Railway **auto-saves** when you change a field. You do **not** need to hunt for a "Save" or "Apply" button.
+
+**What you do after typing `server`:**
+
+1. Click **outside** the text box (anywhere on the page), **or** press **Enter**.
+2. Railway saves automatically — you may see a brief "Saved" toast or the field stays filled in.
+3. Railway usually **starts a new deploy** on its own after you change settings. If it does not, go to the **Deployments** tab (top of the service, next to **Variables** and **Settings**) and click **Redeploy**.
+
+**Where each setting lives (matches your Railway Settings sidebar):**
+
+When you click your GitHub service box → **Settings** tab, the **left sidebar** shows:
+
+| Sidebar item | What you change there |
+|--------------|----------------------|
+| **Source** | Root Directory, connected GitHub repo, branch |
+| **Build** | Build Command, builder type |
+| **Deploy** | Start Command, Pre-deploy Command |
+| **Networking** | Public domain (Step 5) |
+| **Variables** | Env vars like `JWT_SECRET` (Step 4 — separate tab at top, not in this sidebar) |
 
 #### 3b. Set build and start commands
 
-Still in **Settings**, find **Deploy** or **Build & Deploy**:
+Still on the **Settings** tab. Use the **left sidebar** — not the top tabs.
 
-| Setting | Value |
-|---------|-------|
-| **Build Command** | `npm install && npm run build && npx prisma generate && npx prisma db push` |
-| **Start Command** | `npm start` |
-| **Watch Paths** (if available) | `server/**` |
+**Part 1 — Build Command**
 
-**What each part does:**
+1. In the left sidebar, click **Build**.
+2. Find **Build Command** (or **Custom Build Command**).
+3. Paste this exactly:
+
+   ```
+   npm install && npm run build && npx prisma generate && npx prisma db push
+   ```
+
+4. Click outside the box to auto-save.
+
+**Part 2 — Start Command**
+
+1. In the left sidebar, click **Deploy**.
+2. Find **Start Command** (or **Custom Start Command**).
+3. Paste:
+
+   ```
+   npm start
+   ```
+
+4. Click outside the box to auto-save.
+
+**Optional — Watch Paths (if you see it under Source or Build):**
+
+```
+server/**
+```
+
+| Setting | Sidebar location | Value |
+|---------|------------------|-------|
+| **Root Directory** | **Source** | `server` |
+| **Build Command** | **Build** | `npm install && npm run build && npx prisma generate && npx prisma db push` |
+| **Start Command** | **Deploy** | `npm start` |
+
+**What each part of the build command does:**
 
 - `npm install` — installs dependencies
 - `npm run build` — compiles TypeScript to `dist/`
@@ -591,59 +641,178 @@ Still in **Settings**, find **Deploy** or **Build & Deploy**:
 - `npx prisma db push` — creates/updates tables in your Railway PostgreSQL
 - `npm start` — runs `node dist/index.js`
 
-**Alternative (cleaner):** Set **Pre-deploy Command** to `npx prisma db push` and **Build Command** to `npm install && npm run build`.
+**Alternative (cleaner):** Under **Deploy** → **Pre-deploy Command**, set `npx prisma db push`. Under **Build** → **Build Command**, set only `npm install && npm run build`.
+
+**After changing Build / Deploy settings:** Check the **Deployments** tab — a new build should start. If not, open **Deployments** → **Redeploy** (three-dot menu on latest deployment).
 
 #### 3c. Rename the service (optional but clearer)
 
-1. **Settings** → **Service name**
-2. Rename to `taskify-server`
+1. Stay on **Settings**.
+2. At the **top** of the page (above the sidebar), find the **service name** (e.g. `Taskify`) — click it or use the pencil icon.
+3. Rename to `taskify-server`.
+4. Press **Enter** — saves automatically.
 
 ---
 
 ### Deploy Step 4 — Set server environment variables
 
-**Where:** Railway → **taskify-server** service → **Variables** tab
+**Where:** Railway → click your **server GitHub service** (the one with Root Directory = `server`)
 
-Click **+ New Variable** or **Raw Editor** and add:
+**Important:** Variables are **not** in the Settings sidebar. They use a **top tab**.
 
-| Variable | Value | Where to get it |
-|----------|-------|-----------------|
-| `JWT_SECRET` | Same long random string from your local `server/.env` | Your local `server/.env` file |
-| `CLIENT_URL` | Leave empty for now — fill in after Step 6 | You will paste the client URL later |
-| `DATABASE_URL` | Reference variable (see below) | Railway PostgreSQL service |
+#### 4a. Open the Variables tab
 
-#### Link `DATABASE_URL` to PostgreSQL (recommended)
+1. Click your server service box on the project canvas.
+2. At the **top** of the service panel, you see tabs like: **Deployments** · **Variables** · **Metrics** · **Settings**
+3. Click **Variables** (not Settings).
 
-Instead of copying the URL manually, use a **reference variable** so credentials stay in sync:
+#### 4b. Add `JWT_SECRET`
 
-1. On the **taskify-server** → **Variables** tab, click **+ New Variable**
-2. Choose **Add Reference** (or **Reference Variable**)
-3. Select your **PostgreSQL** service
-4. Select variable **`DATABASE_URL`**
-5. Save
+1. Click **+ New Variable** (or **Add Variable**).
+2. **Variable name:** `JWT_SECRET`
+3. **Value:** copy from your local file `server/.env` on your PC (the long random string).
+4. Click **Add** / **Save** (Variables tab **does** have an explicit add button — unlike Settings).
 
-It will look like:
+#### 4c. Add `CLIENT_URL` (temporary)
+
+1. Click **+ New Variable** again.
+2. **Variable name:** `CLIENT_URL`
+3. **Value:** leave as `http://localhost:5173` for now — you will **change this** in Deploy Step 7 after the client has a public URL.
+4. Click **Add**.
+
+#### 4d. Link `DATABASE_URL` to PostgreSQL (recommended)
+
+**What this step means (in plain English):**
+
+Your **server** (Express API) needs to know how to connect to your **PostgreSQL** database. Instead of copying a long password URL by hand, you tell Railway:
+
+> “Use whatever database URL the PostgreSQL service already has.”
+
+That is called a **reference variable**. Railway keeps them in sync automatically if the database password changes.
+
+**You are on:** your **GitHub/server service** → **Variables** tab (same place as 4b and 4c).  
+**You are NOT on:** the PostgreSQL service — do not open the database box for this step.
+
+---
+
+**On your project canvas you should have two different boxes:**
 
 ```
-DATABASE_URL = ${{Postgres.DATABASE_URL}}
+┌─────────────┐     ┌──────────────────┐
+│ PostgreSQL  │     │ Taskify (server) │  ← you add DATABASE_URL HERE
+│  (database) │     │  GitHub service  │
+└─────────────┘     └──────────────────┘
 ```
 
-(Your PostgreSQL service might be named `Postgres` or `PostgreSQL` — pick the one on your canvas.)
+---
 
-> **Do not** set `PORT` manually — Railway injects it automatically.
+**Method A — Reference variable (recommended)**
 
-#### Trigger a redeploy
+Follow these clicks in order:
 
-After saving variables:
+1. Make sure you clicked the **server GitHub service** (Root Directory = `server`), then the **Variables** tab at the top.
+2. Click **+ New Variable** (purple button, top right of the variables list).
+3. A popup / form appears. You may see two modes:
+   - **Regular variable** — name + value text boxes
+   - **Reference variable** — dropdowns to pick another service
 
-1. Go to **Deployments** tab
-2. Click **Deploy** or **Redeploy** on the latest deployment
-3. Wait until status is **Success** / **Active**
+4. Switch to **Reference** if needed:
+   - Look for a tab or toggle: **Reference**, **Reference Variable**, or **From service**
+   - Or a **{}** icon / **Link** option next to “New Variable”
+   - Railway’s UI varies — the goal is to pick a variable **from another service**, not type a URL yourself
+
+5. **First dropdown — Service (or “Reference service”):**
+   - Click the dropdown
+   - Select **PostgreSQL** or **Postgres** — the **database** box from your canvas
+   - **Do NOT** select your GitHub repo service (Taskify / taskify-server)
+
+6. **Second dropdown — Variable (or “Reference variable”):**
+   - Click the dropdown
+   - Select **`DATABASE_URL`**
+   - This is the internal connection string Railway created when you added PostgreSQL
+
+7. **Variable name** at the top should auto-fill as `DATABASE_URL`. If it asks for a name, type exactly:
+
+   ```
+   DATABASE_URL
+   ```
+
+8. Click **Add**, **Save**, or **Create** to finish.
+
+---
+
+**Success — what you should see in the Variables list:**
+
+A new row appears. The **value** is **not** a normal URL — it looks like a template:
+
+```
+DATABASE_URL    ${{Postgres.DATABASE_URL}}
+```
+
+or
+
+```
+DATABASE_URL    ${{PostgreSQL.DATABASE_URL}}
+```
+
+The word `Postgres` / `PostgreSQL` matches whatever your database service is named on the canvas. That is correct.
+
+**How to know it worked:**
+
+| ✅ Correct | ❌ Wrong |
+|-----------|---------|
+| Value starts with `${{` and ends with `}}` | You pasted `postgresql://postgres:...` manually into the server service |
+| Service column or tooltip mentions PostgreSQL | You added `DATABASE_URL` inside the PostgreSQL service itself |
+| You have 3 variables on the **server** service | Variable name is misspelled (`DATABASE_URI`, etc.) |
+
+---
+
+**Method B — Manual copy (only if you cannot find “Reference”)**
+
+If Railway does not show a reference option:
+
+1. Click the **PostgreSQL** box on your canvas (the database, not the server).
+2. Open the **Variables** tab on PostgreSQL.
+3. Find **`DATABASE_URL`** (internal URL — may contain `railway.internal`).
+4. Click the **copy** icon next to it.
+5. Go back to your **server GitHub service** → **Variables** → **+ New Variable**.
+6. **Name:** `DATABASE_URL`
+7. **Value:** paste what you copied
+8. Click **Add**
+
+> When both server and database run on Railway, prefer **Method A**. Method B works but you must update the URL yourself if Railway rotates credentials.
+
+---
+
+**Why not use `DATABASE_PUBLIC_URL` here?**
+
+- `DATABASE_PUBLIC_URL` is for connecting **from your PC** during local dev.
+- On Railway, the server and database are in the **same project** — they talk over Railway’s **private network** using internal `DATABASE_URL`. That is faster and more secure.
+
+> **Do not** add `PORT` — Railway sets it automatically.
+
+#### 4e. Check your Variables list
+
+You should have **3 variables** on the server service:
+
+| Name | Example value |
+|------|----------------|
+| `JWT_SECRET` | `4aab7a7918167457a56f0fa7b116525121017e1ac676fda4346206ef44158e74` |
+| `CLIENT_URL` | `http://localhost:5173` (update later) |
+| `DATABASE_URL` | `${{Postgres.DATABASE_URL}}` (reference) |
+
+#### 4f. Trigger a redeploy
+
+Variables do **not** always apply until the service rebuilds.
+
+1. Click the **Deployments** tab (top of the same service).
+2. Click **Deploy** or the **⋮** three-dot menu on the latest deployment → **Redeploy**.
+3. Wait until status shows **Success** or **Active** (green).
 
 **Check logs if deploy fails:**
 
 1. **Deployments** → click the latest deployment → **View logs**
-2. Common issues: wrong root directory, missing `DATABASE_URL`, Prisma errors
+2. Common issues: Root Directory still empty (should be `server` under **Settings → Source**), missing `DATABASE_URL`, Prisma errors
 
 ---
 
@@ -711,24 +880,33 @@ Replace `YOUR-SERVER-URL` with the domain from Deploy Step 5. Include `/api` at 
 
 > **Important:** Vite reads `VITE_*` variables **at build time**. After changing `VITE_API_URL`, you must **redeploy** the client service.
 
-#### 6d. Update the client code to use `VITE_API_URL` (one-time)
+#### 6d. Client code — already done (skip editing)
 
-**Where:** Cursor → `client/src/api/client.ts`
-
-Make sure the API base URL uses the environment variable in production:
+**Good news:** This project **already has** the correct line in `client/src/api/client.ts`:
 
 ```typescript
 const API_BASE = import.meta.env.VITE_API_URL || "/api";
 ```
 
-Commit and push:
+**You do not need to change any code.** What matters for production:
+
+| Environment | What `API_BASE` uses |
+|-------------|----------------------|
+| **Local** (`npm run dev`) | `/api` → Vite proxy sends requests to `localhost:5000` |
+| **Railway** (after you set `VITE_API_URL` in Step 6c) | Your live server URL, e.g. `https://taskify-server-production-xxxx.up.railway.app/api` |
+
+**Only do this if you have not pushed to GitHub yet:**
+
+Make sure your latest code is on GitHub so Railway can build the client:
 
 ```powershell
 cd C:\Users\beras\OneDrive\Desktop\Taskify
-git add client/src/api/client.ts
-git commit -m "Use VITE_API_URL for production API"
+git add .
+git commit -m "Prepare client for Railway deploy"
 git push
 ```
+
+If your repo is already up to date, **skip straight to 6e** after setting `VITE_API_URL` in Step 6c and redeploying the client.
 
 #### 6e. Generate a public URL for the client
 
