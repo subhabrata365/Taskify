@@ -4,6 +4,7 @@ import ProtectedRoute from "./components/ProtectedRoute";
 import Login from "./pages/Login";
 import Signup from "./pages/Signup";
 import Dashboard from "./pages/Dashboard";
+import ProjectDetail from "./pages/ProjectDetail";
 
 function HomeRedirect() {
   const { user, loading } = useAuth();
@@ -22,6 +23,7 @@ function App() {
           <Route path="/signup" element={<Signup />} />
           <Route element={<ProtectedRoute />}>
             <Route path="/dashboard" element={<Dashboard />} />
+            <Route path="/projects/:id" element={<ProjectDetail />} />
           </Route>
         </Routes>
       </AuthProvider>

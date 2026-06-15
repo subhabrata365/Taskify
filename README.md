@@ -489,7 +489,7 @@ Your Railway project will have **3 services** on the same project canvas:
 |------|-------|
 | Create GitHub repo, push code | Terminal on your PC |
 | Connect repo to Railway, set env vars | [railway.app](https://railway.app) in browser |
-| Database tables on production | Railway runs `prisma db push` during server deploy |
+| Database tables on production | Railway runs `npx prisma db push` in **Pre-deploy** (not Build) |
 
 ---
 
@@ -604,14 +604,28 @@ Still on the **Settings** tab. Use the **left sidebar** — not the top tabs.
 3. Paste this exactly:
 
    ```
-   npm install && npm run build && npx prisma generate && npx prisma db push
+   npm install && npm run build
    ```
 
 4. Click outside the box to auto-save.
 
-**Part 2 — Start Command**
+> **Do not put `prisma db push` in the Build Command.** Railway cannot reach the database during build (private network is runtime-only). That step goes in Pre-deploy below.
+
+**Part 2 — Pre-deploy Command (database tables)**
 
 1. In the left sidebar, click **Deploy**.
+2. Find **Pre-deploy Command** (or **Custom Pre-deploy Command**).
+3. Paste:
+
+   ```
+   npx prisma db push
+   ```
+
+4. Click outside the box to auto-save.
+
+**Part 3 — Start Command**
+
+1. Still in the left sidebar, under **Deploy** (same section as Pre-deploy).
 2. Find **Start Command** (or **Custom Start Command**).
 3. Paste:
 
@@ -630,18 +644,15 @@ server/**
 | Setting | Sidebar location | Value |
 |---------|------------------|-------|
 | **Root Directory** | **Source** | `server` |
-| **Build Command** | **Build** | `npm install && npm run build && npx prisma generate && npx prisma db push` |
+| **Build Command** | **Build** | `npm install && npm run build` |
+| **Pre-deploy Command** | **Deploy** | `npx prisma db push` |
 | **Start Command** | **Deploy** | `npm start` |
 
-**What each part of the build command does:**
+**What each command does:**
 
-- `npm install` — installs dependencies
-- `npm run build` — compiles TypeScript to `dist/`
-- `npx prisma generate` — generates the Prisma client
-- `npx prisma db push` — creates/updates tables in your Railway PostgreSQL
+- `npm install && npm run build` — installs deps and compiles TypeScript (`prisma generate` runs automatically via `postinstall`)
+- `npx prisma db push` — creates/updates tables (**runs at deploy time**, when DB is reachable)
 - `npm start` — runs `node dist/index.js`
-
-**Alternative (cleaner):** Under **Deploy** → **Pre-deploy Command**, set `npx prisma db push`. Under **Build** → **Build Command**, set only `npm install && npm run build`.
 
 **After changing Build / Deploy settings:** Check the **Deployments** tab — a new build should start. If not, open **Deployments** → **Redeploy** (three-dot menu on latest deployment).
 
@@ -864,7 +875,9 @@ Click the new service → **Settings**:
 |---------|-------|
 | **Root Directory** | `client` |
 | **Build Command** | `npm install && npm run build` |
-| **Start Command** | `npx serve -s dist -l $PORT` |
+| **Start Command** | `npm start` |
+
+`npm start` runs `serve` on Railway’s `PORT` (see `client/package.json`).
 
 Rename the service to `taskify-client` (optional, in Settings).
 
@@ -912,14 +925,50 @@ If your repo is already up to date, **skip straight to 6e** after setting `VITE_
 
 **Where:** Railway → **taskify-client** → **Settings** → **Networking**
 
-1. Click **Generate Domain**
-2. Copy the URL, e.g.:
+##### If Railway asks “Which port is your app listening on?”
 
-   ```
-   https://taskify-client-production-xxxx.up.railway.app
-   ```
+Railway needs the **same port** your app uses. Railway sets this automatically as the `PORT` variable.
 
-This is your **live app URL** for submission.
+**Step 1 — Find your port number**
+
+1. Click **taskify-client** → **Variables** tab.
+2. Scroll to **“X variables added by Railway”** and expand it.
+3. Find **`PORT`** — note the number (often `8080` or similar).
+
+**If `PORT` is not visible yet:** deploy once first (**Deployments** → **Redeploy**), then open the deploy **logs**. Look for a line like:
+
+```
+Accepting connections at http://0.0.0.0:8080
+```
+
+The number at the end (`8080`) is what you enter.
+
+**Step 2 — Make sure Start Command is correct**
+
+**Settings** → sidebar **Deploy** → **Start Command:**
+
+```
+npm start
+```
+
+**Step 3 — Generate the domain**
+
+1. **Settings** → sidebar **Networking**.
+2. Click **Generate Domain**.
+3. When asked for **port**, enter the `PORT` value from Step 1 (e.g. `8080`).
+4. Confirm / Generate.
+
+**Step 4 — Copy your live URL**
+
+Railway gives you a URL like:
+
+```
+https://taskify-client-production-xxxx.up.railway.app
+```
+
+This is your **live app URL** for submission (open this in the browser, not the server URL).
+
+> **Tip:** Port is **not** `5173` (that’s only local Vite dev) and **not** `5000` (that’s the API). Use Railway’s `PORT` for the **client** service only.
 
 ---
 
@@ -1003,7 +1052,7 @@ Railway automatically redeploys connected services.
 
 **If you change the database schema** (`server/prisma/schema.prisma`):
 
-- Server build already runs `npx prisma db push`
+- Server **Pre-deploy** runs `npx prisma db push` (not during build)
 - Or run manually from your PC against production (not recommended) — prefer redeploying the server
 
 **If you change client API URL or env vars:**
@@ -1033,13 +1082,32 @@ PostgreSQL service                      (Railway managed DB)
 
 ### Deployment troubleshooting
 
-#### Server deploy fails at `prisma db push`
+#### Server deploy fails at `prisma db push` / "Can't reach database server" during build
+
+**Cause:** `npx prisma db push` is in the **Build Command**. Railway’s database private network is **not available during build** — only at deploy/runtime.
 
 **Fix:**
 
+1. **Settings** → **Build** → **Build Command** → set to:
+
+   ```
+   npm install && npm run build
+   ```
+
+2. **Settings** → **Deploy** → **Pre-deploy Command** → set to:
+
+   ```
+   npx prisma db push
+   ```
+
+3. **Deployments** → **Redeploy**
+
+Railway may show a **"Fix build and pre-deploy commands"** button on the failed deployment — you can click that too.
+
+**Also check:**
+
 1. Confirm `DATABASE_URL` is a **reference** to the PostgreSQL service
 2. PostgreSQL service must be **Active** before server deploys
-3. Check server deploy logs for the exact Prisma error
 
 #### Client shows page but API calls go to `localhost`
 
@@ -1074,7 +1142,8 @@ git push
 | Setting | Value |
 |---------|-------|
 | Root Directory | `server` |
-| Build Command | `npm install && npm run build && npx prisma generate && npx prisma db push` |
+| Build Command | `npm install && npm run build` |
+| Pre-deploy Command | `npx prisma db push` |
 | Start Command | `npm start` |
 | Variables | `DATABASE_URL` (ref), `JWT_SECRET`, `CLIENT_URL` |
 
@@ -1084,7 +1153,7 @@ git push
 |---------|-------|
 | Root Directory | `client` |
 | Build Command | `npm install && npm run build` |
-| Start Command | `npx serve -s dist -l $PORT` |
+| Start Command | `npm start` |
 | Variables | `VITE_API_URL=https://YOUR-SERVER-URL.up.railway.app/api` |
 
 ---

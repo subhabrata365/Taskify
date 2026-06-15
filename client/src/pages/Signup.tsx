@@ -1,6 +1,7 @@
 import { type FormEvent, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
+import Logo from "../components/Logo";
 
 export default function Signup() {
   const { signup } = useAuth();
@@ -29,6 +30,9 @@ export default function Signup() {
   return (
     <div className="auth-page">
       <div className="auth-card">
+        <div className="auth-logo">
+          <Logo size="lg" />
+        </div>
         <h1>Create account</h1>
         <p className="subtitle">Join Taskify — first user becomes Admin</p>
 
