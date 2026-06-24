@@ -1,4 +1,12 @@
-const API_BASE = import.meta.env.VITE_API_URL || "/api";
+function getApiBase(): string {
+  const { hostname } = window.location;
+  if (hostname === "localhost" || hostname === "127.0.0.1") {
+    return "http://localhost:3000";
+  }
+  return "https://taskify-server-production.up.railway.app";
+}
+
+const API_BASE = getApiBase();
 
 export interface User {
   id: string;
